@@ -1,81 +1,27 @@
 ---
-- hosts: localhost
+- name: Build the web and database container image
+  hosts: localhost
   become: true
 
   tasks:
-    - name: Install prerequisites
-      apt:
+    - name: Install Docker and Python Docker support
+      ansible.builtin.apt:
         name:
-          - ca-certificates
-          - curl
+          - docker.io
           - python3-docker
         state: present
-        update_cache: yes
+        update_cache: true
 
-    - name: Create directory for APT keyrings
-      file:
-        path: /etc/apt/keyrings
-        state: directory
-        mode: '0755'
-
-    - name: Download Docker official GPG key
-      get_url:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        dest: /etc/apt/keyrings/docker.asc
-        mode: '0644'
-
-    - name: Add Docker official APT repository
-      apt_repository:
-        repo: >-
-          deb [arch={{ 'amd64' if ansible_architecture == 'x86_64'
-          else 'arm64' if ansible_architecture == 'aarch64'
-          else ansible_architecture }}
-          signed-by=/etc/apt/keyrings/docker.asc]
-          https://download.docker.com/linux/ubuntu
-          {{ ansible_distribution_release }} stable
-        state: present
-        filename: docker
-
-    - name: Update APT cache
-      apt:
-        update_cache: yes
-
-    - name: Install Docker and Python Docker SDK
-      apt:
-        name:
-          - docker-ce
-          - docker-ce-cli
-          - containerd.io
-          - docker-buildx-plugin
-          - docker-compose-plugin
-          - python3-docker
-        state: present
-
-    - name: Enable and start Docker service
-      systemd:
+    - name: Enable and start Docker
+      ansible.builtin.service:
         name: docker
-        enabled: yes
         state: started
+        enabled: true
 
-    - name: Enable and start Docker socket
-      systemd:
-        name: docker.socket
-        enabled: yes
-        state: started
-
-    - name: Add current user to docker group
-      user:
-        name: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
-        groups: docker
-        append: yes
-
-    - name: Build the web and DB server image
-      command:
-        argv:
-          - docker
-          - build
-          - -t
-          - web_db_server:latest
-          - "{{ playbook_dir }}"
-      args:
-        chdir: "{{ playbook_dir }}"
+    - name: Build the Docker image
+      community.docker.docker_image:
+        name: activity11-web-db
+        tag: "1.0"
+        source: build
+        build:
+          path: "{{ playbook_dir }}"
